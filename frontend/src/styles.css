@@ -1,0 +1,776 @@
+@import 'tailwindcss';
+
+/* The brand face. Sixtyfour (Google Fonts, SIL Open Font License 1.1 — the licence text
+ * sits beside the file in `assets/Sixtyfour-OFL.txt`). Bundled, not fetched: the latin
+ * subset is 3 KB and this app binds to loopback, so the wordmark has to render with the
+ * network unplugged like everything else here.
+ *
+ * `font-display: block` rather than `swap`, and only here. Everywhere else swapping to a
+ * fallback mid-load is the polite behaviour; for a wordmark it means the logo visibly
+ * changes shape a beat after the page appears. The file is same-origin and 3 KB, so the
+ * block period is imperceptible.
+ *
+ * It is a display face for exactly one string — never for interface text, never for a
+ * number. It has no bold, and its glyphs are drawn from stacked bars, which is legible at
+ * "PerpLab" and illegible at anything longer. */
+@font-face {
+  font-family: 'Sixtyfour';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('./assets/sixtyfour-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF;
+}
+
+/* Design system — spec 10.1.
+ *
+ * One stylesheet, two token sets, swapped on `:root[data-theme]`. Never duplicated
+ * components: a light-mode component and a dark-mode component drift, and the drift is
+ * always discovered by someone using the mode you do not.
+ *
+ * Colour carries meaning and is never decoration. `--neg` (#DC2626) is reserved for the
+ * kill switch in the persistent chrome — nothing else in the UI may use it, so that when
+ * that red appears it means exactly one thing. Negative numbers use `--down`, which is the
+ * same hue family and deliberately not the same token.
+ *
+ * The aesthetic is monochrome-first: the interface itself is black, white and grey, and
+ * chromatic colour is reserved for meaning — profit, loss, warning, information, kill.
+ * When something on this screen is green, money was made; the design never spends that
+ * signal on a button.
+ */
+
+:root,
+:root[data-theme='dark'] {
+  --bg: #09090b;
+  --surface: #101013;
+  --surface-2: #17171b;
+  --surface-3: #1e1e23;
+  --border: #222227;
+  --border-strong: #34343c;
+  --text: #fafafa;
+  --text-dim: #a7a7b0;
+  --text-mute: #62626b;
+  --accent: #fafafa;
+  --accent-ink: #09090b;
+  --pos: #2fbf84;
+  --neg: #dc2626;
+  --down: #f0524f;
+  --warn: #e8a13c;
+  --info: #38b6d8;
+  --scrim: rgba(3, 3, 5, 0.62);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 8px 28px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.35);
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --bg: #fbfbfc;
+  --surface: #ffffff;
+  --surface-2: #f1f1f3;
+  --surface-3: #e8e8eb;
+  --border: #e3e3e7;
+  --border-strong: #cdcdd4;
+  --text: #17171a;
+  --text-dim: #4f4f58;
+  --text-mute: #8b8b94;
+  --accent: #17171a;
+  --accent-ink: #ffffff;
+  --pos: #0e8a5f;
+  --neg: #dc2626;
+  --down: #c93434;
+  --warn: #a96a12;
+  --info: #0d7fa3;
+  --scrim: rgba(23, 23, 26, 0.4);
+  --shadow-1: 0 1px 2px rgba(23, 23, 26, 0.07);
+  --shadow-2: 0 8px 28px rgba(23, 23, 26, 0.14), 0 2px 8px rgba(23, 23, 26, 0.08);
+  color-scheme: light;
+}
+
+/* Typography — a clean sans for the interface, mono for every number, code, id and
+ * timestamp. `tabular-nums` on numeric surfaces so columns align and a changing digit
+ * does not reflow a live view (spec 10.1). The stacks fall back through system fonts
+ * rather than fetching from a CDN: this app binds to loopback and must work with no
+ * network at all. 'Segoe UI Variable Text' ships with Windows 11 and is the best of the
+ * fallbacks, so it is named ahead of plain Segoe UI.
+ *
+ * Geometry tokens: two radii (panels and controls), one motion curve. Anything animated
+ * uses `--ease` and a duration under 250ms — transitions should be felt, not watched. */
+:root {
+  --font-ui: 'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system,
+    sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Mono', Consolas, 'SF Mono', monospace;
+  /* One string wears this: the wordmark. See the @font-face note at the top. */
+  --font-brand: 'Sixtyfour', var(--font-mono);
+  --radius: 8px;
+  --radius-sm: 6px;
+  --ease: cubic-bezier(0.25, 0.6, 0.3, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The wordmark. Sixtyfour draws each letter from stacked bars, so it needs three things
+ * the interface font does not:
+ *
+ * - `line-height: 1` and a fixed `height`, because the face's own line box is enormous
+ *   relative to its cap height. Left alone it would set the 48px header's row height by
+ *   itself and push every control off-centre.
+ * - No tracking of our own. The face is drawn on a fixed grid and its side bearings are
+ *   part of that grid, so letter-spacing here fights the design rather than tuning it.
+ * - `text-transform: none` guarded explicitly — the capital P and L are the only two
+ *   uppercase forms in the mark and they are load-bearing.
+ *
+ * Sized in the chrome, not here, so one component owns how big the logo is. */
+.pl-wordmark {
+  font-family: var(--font-brand);
+  font-weight: 400;
+  line-height: 1;
+  text-transform: none;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+/* Every interactive element shares one focus treatment, so keyboard users see the same
+ * ring everywhere rather than a different afterthought per component. */
+:where(button, input, select, textarea, a, [tabindex]):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 1px;
+  border-radius: var(--radius-sm);
+}
+
+/* ---------------------------------------------------------------- primitives */
+
+.pl-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.pl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12px;
+  font-family: var(--font-ui);
+  font-weight: 450;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  transition: background 140ms var(--ease), border-color 140ms var(--ease),
+    color 140ms var(--ease), transform 80ms var(--ease);
+}
+
+.pl-btn:hover:not(:disabled) {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+}
+
+.pl-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.pl-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pl-btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+  font-weight: 550;
+}
+
+.pl-btn-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 86%, var(--bg));
+  border-color: color-mix(in srgb, var(--accent) 86%, var(--bg));
+}
+
+.pl-btn-danger {
+  border-color: color-mix(in srgb, var(--down) 45%, var(--border));
+  color: var(--down);
+}
+
+.pl-btn-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--down) 12%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--down) 60%, var(--border));
+}
+
+/* Icon-sized square button (theme toggle, copy, close). */
+.pl-btn-icon {
+  width: 28px;
+  padding: 0;
+  justify-content: center;
+}
+
+.pl-input {
+  height: 28px;
+  padding: 0 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  width: 100%;
+  transition: border-color 140ms var(--ease);
+}
+
+.pl-input:hover:not(:disabled):not(:focus) {
+  border-color: var(--border-strong);
+}
+
+.pl-input:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 0;
+  border-color: var(--border-strong);
+}
+
+.pl-input::placeholder {
+  color: var(--text-mute);
+}
+
+.pl-input.mono {
+  font-family: var(--font-mono);
+}
+
+.pl-tag {
+  display: inline-block;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  line-height: 1.6;
+}
+
+/* Keyboard hint — ⌘K, Esc, Enter. Rendered as a key, read as a key. */
+.pl-kbd {
+  display: inline-block;
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--text-mute);
+  font-size: 10px;
+  font-family: var(--font-mono);
+  line-height: 16px;
+}
+
+/* Section heading — quiet, uppercase, used to break long pages into scannable regions. */
+.pl-heading {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+/* Stat card — the one implementation of the pattern RunDetail, LiveMonitor, ParityReport
+ * and LabResults each hand-rolled. A label over a large mono value. */
+.pl-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  min-width: 132px;
+}
+
+.pl-card-label {
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  white-space: nowrap;
+}
+
+.pl-card-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* KPI — the number the eye should land on first. Dashboard PnL, monitor position. */
+.pl-kpi {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* The dense data table. `tabular-nums` is on the whole table rather than on the cells
+ * that happen to hold numbers today: these tables are live in the monitor, and a column
+ * that stops being numeric-looking for one render is a column that jumps. */
+.pl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.pl-table th {
+  padding: 6px 10px;
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+
+.pl-table td {
+  padding: 5px 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+
+.pl-table tbody tr {
+  transition: background 100ms var(--ease);
+}
+
+.pl-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+}
+
+/* The last row's rule is the panel's own border repeated one pixel above itself. */
+.pl-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Bar / meter primitive: risk-limit usage and liquidation proximity (spec 10.3).
+ *
+ * The fill is a child element rather than a background gradient so its width can be a
+ * plain percentage and its colour can be set per instance from the existing tokens. */
+.pl-meter {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 60px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.pl-meter-fill {
+  display: block;
+  height: 100%;
+  background: var(--text-dim);
+  transition: width 200ms linear;
+}
+
+/* Connection state. Always paired with a word ("market up") — a bare dot is a colour,
+ * and colour alone is not a signal here any more than it is on a number (spec 10.1).
+ * `.pl-dot-live` breathes, so "connected and flowing" and "connected but frozen" look
+ * different at a glance. */
+.pl-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-mute);
+  flex: none;
+}
+
+.pl-dot-live {
+  animation: pl-pulse 2s var(--ease) infinite;
+}
+
+@keyframes pl-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 35%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px transparent;
+  }
+}
+
+/* One line of the Feed. Fixed height, because the list is virtualised on a row count and
+ * a row that wraps would put every row below it in the wrong place. The 22px here is
+ * load-bearing: `Feed.tsx` declares `ROW_HEIGHT = 22` and does arithmetic with it. */
+.pl-feed-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 22px;
+  padding: 0 8px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  line-height: 22px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.pl-feed-row:hover {
+  background: var(--surface-2);
+}
+
+.pl-scroll {
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.pl-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.pl-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+
+.pl-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Draggable pane divider (Runs tab).
+ *
+ * The element is 1px wide so it *is* the border it replaces — the layout is identical when
+ * nobody is dragging. The grab area is widened to 11px by a transparent ::before overlay
+ * instead: a 1px hit target is a pixel-hunt, but a 11px *visible* seam is a gutter down the
+ * middle of the page. Hover reveals the grip, so the affordance appears where the pointer
+ * already is rather than advertising itself permanently.
+ *
+ * z-index clears RunList's sticky table header, which sits at 1 and would otherwise occlude
+ * the top of the handle exactly where the header row invites you to drag. */
+.pl-splitter {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 1px;
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+  cursor: col-resize;
+  touch-action: none;
+  transition: background 140ms var(--ease);
+}
+
+.pl-splitter::before {
+  content: '';
+  position: absolute;
+  inset: 0 -5px;
+}
+
+/* The grip: three-quarters height, centred, fading in on hover. `transform` and `opacity`
+ * only — animating width or left here would reflow the two panes on every hover. */
+.pl-splitter::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 3px;
+  height: 40px;
+  max-height: 60%;
+  border-radius: 2px;
+  background: var(--border-strong);
+  transform: translate(-50%, -50%) scaleX(0.5);
+  opacity: 0;
+  transition: opacity 140ms var(--ease), transform 140ms var(--ease),
+    background 140ms var(--ease);
+}
+
+.pl-splitter:hover,
+.pl-splitter:focus-visible,
+.pl-splitter[data-dragging] {
+  background: var(--border-strong);
+}
+
+.pl-splitter:hover::after,
+.pl-splitter:focus-visible::after,
+.pl-splitter[data-dragging]::after {
+  opacity: 1;
+  transform: translate(-50%, -50%) scaleX(1);
+}
+
+.pl-splitter:focus-visible::after,
+.pl-splitter[data-dragging]::after {
+  background: var(--accent);
+}
+
+.pl-splitter:focus-visible {
+  outline: none;
+}
+
+/* Dragging must not leave the pointer selecting the run table it passes over. */
+body:has(.pl-splitter[data-dragging]) {
+  cursor: col-resize;
+  user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pl-splitter,
+  .pl-splitter::after {
+    transition: none;
+  }
+}
+
+/* Diagnostics severity. An icon glyph accompanies the colour everywhere these are used:
+ * colour alone fails for colour-blind readers and fails in a screenshot (spec 10.1). */
+.sev-error {
+  color: var(--down);
+}
+.sev-warning {
+  color: var(--warn);
+}
+.sev-info {
+  color: var(--info);
+}
+
+/* Unified diff. Hue plus a leading +/- character, for the same reason. */
+.diff-add {
+  background: color-mix(in srgb, var(--pos) 14%, transparent);
+  color: var(--text);
+}
+.diff-del {
+  background: color-mix(in srgb, var(--down) 14%, transparent);
+  color: var(--text);
+}
+.diff-meta {
+  color: var(--text-mute);
+}
+
+/* ---------------------------------------------------------------- overlays */
+
+/* Modal scrim + panel. One implementation; the four dialogs each hardcoded an
+ * rgba(0,0,0,…) scrim that was wrong in light mode. */
+.pl-scrim {
+  position: fixed;
+  inset: 0;
+  background: var(--scrim);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  z-index: 50;
+  animation: pl-fade 140ms var(--ease);
+}
+
+.pl-modal {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-2);
+  animation: pl-rise 180ms var(--ease);
+}
+
+/* Toast — bottom-right, arrives with the same rise the modals use. */
+.pl-toast {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 60;
+  box-shadow: var(--shadow-2);
+  animation: pl-rise 180ms var(--ease);
+}
+
+/* CSS-only tooltip. Put `data-tip="…"` on an element; the bubble renders above it on
+ * hover/focus. For terms of art (Sharpe, MAE, fill tier) where a sentence of context
+ * saves a trip to the docs. Not for text that matters on touch screens — it never shows
+ * there — so anything load-bearing stays visible in the layout. */
+[data-tip] {
+  position: relative;
+}
+
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) translateY(2px);
+  max-width: 280px;
+  width: max-content;
+  padding: 5px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text-dim);
+  font-size: 11px;
+  font-family: var(--font-ui);
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  line-height: 1.45;
+  white-space: normal;
+  text-align: left;
+  box-shadow: var(--shadow-1);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 120ms var(--ease), transform 120ms var(--ease);
+  z-index: 40;
+}
+
+[data-tip]:hover::after,
+[data-tip]:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+  transition-delay: 250ms;
+}
+
+/* ---------------------------------------------------------------- motion */
+
+/* Loading skeleton. A quiet shimmer where content is about to be, so a data fetch reads
+ * as "coming" rather than "empty" — the two mean different things on a trading screen. */
+.pl-skel {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-2);
+  border-radius: 4px;
+  color: transparent !important;
+  user-select: none;
+}
+
+.pl-skel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    color-mix(in srgb, var(--text) 5%, transparent) 50%,
+    transparent 80%
+  );
+  animation: pl-shimmer 1.4s var(--ease) infinite;
+}
+
+@keyframes pl-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* Value-change flash: a live number that just moved briefly tints toward the direction
+ * it moved, then settles. Re-triggered from JS by swapping the class on a keyed span. */
+@keyframes pl-flash-up {
+  0% {
+    color: var(--pos);
+  }
+  100% {
+    color: inherit;
+  }
+}
+
+@keyframes pl-flash-down {
+  0% {
+    color: var(--down);
+  }
+  100% {
+    color: inherit;
+  }
+}
+
+.pl-flash-up {
+  animation: pl-flash-up 900ms var(--ease);
+}
+
+.pl-flash-down {
+  animation: pl-flash-down 900ms var(--ease);
+}
+
+/* Row entrance — a fill or feed line that just arrived slides in by a few pixels. */
+@keyframes pl-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.pl-enter {
+  animation: pl-enter 220ms var(--ease);
+}
+
+@keyframes pl-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes pl-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+}
+
+/* Panel entrance for tab switches — barely there, just enough that a new page feels
+ * placed rather than swapped. */
+.pl-page {
+  animation: pl-fade 160ms var(--ease);
+}
+
+@keyframes pl-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.pl-spin {
+  animation: pl-spin 900ms linear infinite;
+}
+
+/* Motion is a courtesy, never a requirement. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
