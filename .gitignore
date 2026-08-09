@@ -1,0 +1,28 @@
+# Spec 2.4: userdata is the local data lake, strategy store, and run archive.
+# It is large (tens of GB) and machine-specific. Never committed.
+userdata/
+
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.hypothesis/
+build/
+dist/
+
+# Live exchange credentials. Never commit these -- a public push is scraped by bots
+# within minutes. Keys belong in a password manager or the OS keychain, not the tree.
+PLBCD.txt
+*.key
+*.pem
+.env
+.env.*
+
+# Frontend build inputs and outputs. node_modules is restored by `npm ci` from
+# package-lock.json, and tsbuildinfo is an incremental-compile cache.
+node_modules/
+*.tsbuildinfo
+
+.vscode/
+.idea/

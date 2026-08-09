@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
+    <title>PerpLab</title>
+    <script>
+      // Applied before first paint. Reading the stored theme from React would repaint the
+      // whole shell one frame in, which on a dark-by-default tool is a white flash in a
+      // dark room.
+      try {
+        var stored = localStorage.getItem('perplab.theme')
+        if (stored === 'light' || stored === 'dark') {
+          document.documentElement.dataset.theme = stored
+        }
+      } catch (_) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

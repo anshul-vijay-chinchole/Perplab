@@ -1,0 +1,26 @@
+## PerpLab data limitations — for the record
+
+**What's fully covered (Level 1–2, 6.6 years, gap-free):** any directional strategy that reacts to a signal and places a market order — momentum, trend-following, breakout, indicator-crossover, mean-reversion-with-market-orders, DCA/scheduled buying. This is the overwhelming majority of retail strategy styles, and it's backed by complete trade-level data from 2019-12-31 to today.
+
+**What is NOT reliably backtestable here** — all four require Level 3 (bookTicker) or Level 4 (book walk) data, of which PerpLab currently holds only 12 scattered days (bookTicker) and 5 days growing forward (book walk), nowhere near enough for a real backtest:
+
+1. **Market making** — placing simultaneous buy/sell limit orders around the current price to profit from the spread itself, rather than predicting direction.
+
+2. **Grid / ladder trading** — a pre-set ladder of buy/sell limit orders across a price range, profiting from price oscillating within it.
+
+3. **Large-order / iceberg execution** — breaking a big order into small resting pieces to avoid moving the market; the edge is entirely in fill mechanics, not direction.
+
+4. **Cross-venue or spot/futures arbitrage** — capturing a tiny, fast-closing price gap between two markets, usually requiring limit orders on at least one leg to avoid the gap being eaten by fees/slippage.
+
+**The common thread:** all four depend on knowing *whether a resting order at an exact price would actually have been filled* — something a trade-only tape can't answer, because it only records trades that happened, not the standing buy/sell offers waiting the whole time. PerpLab's Level 2 data is trade-only, so backtests of these four styles would be simulating fills the platform can't actually verify happened.
+
+**Given you've ruled out large-capital trades, arbitrage, and sit-and-wait market-making/grids** — none of these four limitations currently affect what you're building. Worth keeping on record in case that scope ever changes.
+
+Can market-making / grid / iceberg / arbitrage be paper-traded or live-traded?
+Yes — and this is an important distinction from what we discussed. The Level 3/4 data limitation is specifically a backtesting problem — it's about not having enough historical bookTicker/depth archives to honestly replay the past. It has nothing to do with paper or live trading.
+
+In paper mode, PerpLab is watching Binance's real, live order book as it happens right now — the actual current spread, the actual current depth. There's no historical gap to worry about, because nothing historical is being asked for. A market-making or grid strategy placing real limit orders against that live feed gets realistic fills, the same way it would in backtesting if you had 6 years of bookTicker data — except here you effectively do, because it's live.
+
+In live mode, it's even more literal: real limit orders go to Binance itself, and Binance's own matching engine decides if and when they fill. That's about as real as it gets — no simulation involved at all.
+
+So the honest summary: you can't trust a backtest of these four strategy types against years of history, because that history barely exists in your lake. But you can paper-trade or live-trade them starting today with full realism, because both of those modes use live data, not the archive. The limitation only applies to answering "how would this have performed over the past 6 years" — not to "does this work going forward."
